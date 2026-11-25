@@ -5,7 +5,7 @@
   "name": "Far Player Map Markers",
   "authors": [ "Jumboking3" ],
   "description": "Tracks all online players on the server and shows their position and facing direction on the world map and minimap, even outside the normal entity tracking range. Also shares every player's waypoints. Settings in-game with .farmarkers.",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "side": "Universal",
   "requiredOnClient": true,
   "requiredOnServer": true,

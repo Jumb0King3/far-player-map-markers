@@ -5,7 +5,7 @@
   "farplayermarkers:fill-color": "Fill colour:",
   "farplayermarkers:border-color": "Border colour:",
   "farplayermarkers:use-player-colors": "Use player-chosen colours:",
-  "farplayermarkers:hex-help": "Click a colour square or Pick to open the colour wheel, or type a hex code.",
+  "farplayermarkers:hex-help": "Click a colour square or Edit to open the colour picker, or type a hex code.",
   "farplayermarkers:server-settings-admin": "Server Settings (Admin Only)",
   "farplayermarkers:update-rate": "Update rate (ms):",
   "farplayermarkers:hide-sneaking": "Hide crouching players:",
@@ -33,5 +33,6 @@
   "farplayermarkers:blocks-away": "{0} blocks away",
   "farplayermarkers:died-here": "{0} died here",
   "farplayermarkers:waypoint": "Waypoint",
-  "farplayermarkers:owners-waypoint": "{0}'s waypoint"
+  "farplayermarkers:owners-waypoint": "{0}'s waypoint",
+  "farplayermarkers:layer-title": "Far players"
 }

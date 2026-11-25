@@ -31,7 +31,7 @@ namespace FarPlayerMarkers
             capi = api as ICoreClientAPI;
         }
 
-        public override string Title => "Far players";
+        public override string Title => Lang.Get("farplayermarkers:layer-title");
 
         public override string LayerGroupCode => "farplayermarkers";
 

@@ -52,15 +52,38 @@ namespace FarPlayerMarkers
 
         private void Compose()
         {
-            const double colWidth = 335;
+            // Widths grow to fit longer translations; the English sizes are the minimum.
             const double colGap = 30;
-            const double labelWidth = 115;
             const double swatchSize = 28;
-            const double editWidth = 70;
             const double hexWidth = 92;
             const double rowHeight = 38;
-            const double toggleLabelWidth = 230;
-            const double fullWidth = colWidth * 2 + colGap;
+            const double toggleButtonWidth = 60;
+
+            string fillLabel = Lang.Get("farplayermarkers:fill-color");
+            string borderLabel = Lang.Get("farplayermarkers:border-color");
+            double labelWidth = Math.Max(115, Math.Max(TextWidth(fillLabel), TextWidth(borderLabel)) + 10);
+            double editWidth = Math.Max(70, TextWidth(Lang.Get("farplayermarkers:edit")) + 26);
+            double sideToggleWidth = Math.Max(190, Math.Max(
+                TextWidth(Lang.Get("farplayermarkers:use-player-colors")),
+                TextWidth(Lang.Get("farplayermarkers:hide-sneaking"))) + 10);
+
+            double colWidth = 335;
+            colWidth = Math.Max(colWidth, labelWidth + swatchSize + 8 + hexWidth + 8 + editWidth);
+            colWidth = Math.Max(colWidth, sideToggleWidth + toggleButtonWidth);
+            colWidth = Math.Max(colWidth, TextWidth(Lang.Get("farplayermarkers:your-marker")) + 10);
+            colWidth = Math.Max(colWidth, TextWidth(Lang.Get("farplayermarkers:others-markers")) + 10);
+
+            double toggleLabelWidth = Math.Max(230, Math.Max(
+                TextWidth(Lang.Get("farplayermarkers:keep-at-edge")), Math.Max(
+                TextWidth(Lang.Get("farplayermarkers:show-waypoints")),
+                TextWidth(Lang.Get("farplayermarkers:share-waypoints")))) + 10);
+            double rateLabelWidth = Math.Max(150, TextWidth(Lang.Get("farplayermarkers:update-rate")) + 10);
+            double cancelWidth = Math.Max(130, TextWidth(Lang.Get("farplayermarkers:cancel")) + 40);
+            double saveWidth = Math.Max(170, TextWidth(Lang.Get("farplayermarkers:save-close")) + 40);
+
+            double fullWidth = colWidth * 2 + colGap;
+            fullWidth = Math.Max(fullWidth, toggleLabelWidth + toggleButtonWidth);
+            fullWidth = Math.Max(fullWidth, cancelWidth + saveWidth + 20);
             double right = colWidth + colGap;
             double top = GuiStyle.TitleBarHeight + 5;
 
@@ -97,7 +120,7 @@ namespace FarPlayerMarkers
             y += rowHeight;
 
             // Under the others column: use each player's own colours
-            AddToggleRow(composer, right, y, 190, Lang.Get("farplayermarkers:use-player-colors"), usePlayerColors, OnToggleUsePlayerColors, "useplayercolors", textFont);
+            AddToggleRow(composer, right, y, sideToggleWidth, Lang.Get("farplayermarkers:use-player-colors"), usePlayerColors, OnToggleUsePlayerColors, "useplayercolors", textFont);
             y += rowHeight + 6;
 
             // Display options
@@ -114,17 +137,17 @@ namespace FarPlayerMarkers
                 composer.AddStaticText(Lang.Get("farplayermarkers:server-settings-admin"), headFont, ElementBounds.Fixed(0, y, fullWidth, 25));
                 y += 32;
 
-                composer.AddStaticText(Lang.Get("farplayermarkers:update-rate"), textFont, ElementBounds.Fixed(0, y + 5, 150, 25));
-                composer.AddTextInput(ElementBounds.Fixed(150, y, 80, 28), OnIntervalChanged, textFont, "interval");
-                AddToggleRow(composer, right, y, 190, Lang.Get("farplayermarkers:hide-sneaking"), hideCrouching, OnToggleHideCrouching, "hidecrouching", textFont);
+                composer.AddStaticText(Lang.Get("farplayermarkers:update-rate"), textFont, ElementBounds.Fixed(0, y + 5, rateLabelWidth, 25));
+                composer.AddTextInput(ElementBounds.Fixed(rateLabelWidth, y, 80, 28), OnIntervalChanged, textFont, "interval");
+                AddToggleRow(composer, right, y, sideToggleWidth, Lang.Get("farplayermarkers:hide-sneaking"), hideCrouching, OnToggleHideCrouching, "hidecrouching", textFont);
                 y += rowHeight;
                 AddToggleRow(composer, 0, y, toggleLabelWidth, Lang.Get("farplayermarkers:share-waypoints"), shareWaypoints, OnToggleShareWaypoints, "sharewaypoints", textFont);
                 y += rowHeight + 6;
             }
 
             // Cancel / Save & Close
-            composer.AddButton(Lang.Get("farplayermarkers:cancel"), OnCancel, ElementBounds.Fixed(0, y + 10, 130, 32));
-            composer.AddButton(Lang.Get("farplayermarkers:save-close"), OnSave, ElementBounds.Fixed(fullWidth - 170, y + 10, 170, 32));
+            composer.AddButton(Lang.Get("farplayermarkers:cancel"), OnCancel, ElementBounds.Fixed(0, y + 10, cancelWidth, 32));
+            composer.AddButton(Lang.Get("farplayermarkers:save-close"), OnSave, ElementBounds.Fixed(fullWidth - saveWidth, y + 10, saveWidth, 32));
 
             composer.EndChildElements();
             SingleComposer = composer.Compose();
@@ -136,6 +159,18 @@ namespace FarPlayerMarkers
             SingleComposer.GetTextInput("otherborder").SetValue(otherBorder);
             if (mod.IsAdmin) SingleComposer.GetTextInput("interval").SetValue(intervalText);
             composing = false;
+        }
+
+        /// <summary>
+        /// Rough width of a line of small GUI text, so labels in longer languages get more room.
+        /// Wide (Chinese/Japanese/Korean) characters count about double.
+        /// </summary>
+        private static double TextWidth(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            double w = 0;
+            foreach (char c in text) w += c >= 0x2E80 ? 15 : 7.6;
+            return w;
         }
 
         /// <summary>Label, colour square, hex box (copy/paste or type), Edit button.</summary>
