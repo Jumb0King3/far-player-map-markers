@@ -109,10 +109,10 @@ namespace FarPlayerMarkers
                 SendServerSettings(splayer);
                 SendWaypointsTo(splayer);
             };
-            api.Event.PlayerLeave += (player) =>
-            {
-                if (player != null) playerColors.Remove(player.PlayerUID);
-            };
+            // Colours are kept after a player leaves (and saved with the world),
+            // so their death markers keep their colour while they're offline.
+            api.Event.SaveGameLoaded += LoadPlayerColors;
+            api.Event.GameWorldSave += SavePlayerColors;
 
             StartTicking();
             api.Event.RegisterGameTickListener(OnWaypointTick, WaypointCheckIntervalMs);
@@ -204,6 +204,50 @@ namespace FarPlayerMarkers
                 FillHex = ColorHex.Normalize(packet.FillHex),
                 BorderHex = ColorHex.Normalize(packet.BorderHex)
             };
+            SavePlayerColors();
+        }
+
+        private const string ColorsSaveKey = "farplayermarkers-playercolors";
+
+        /// <summary>Reads saved player colours from the world save ("uid\tfill\tborder" per line).</summary>
+        private void LoadPlayerColors()
+        {
+            try
+            {
+                byte[] data = sapi.WorldManager.SaveGame.GetData(ColorsSaveKey);
+                if (data == null) return;
+                foreach (string line in Encoding.UTF8.GetString(data).Split('\n'))
+                {
+                    string[] parts = line.Split('\t');
+                    if (parts.Length < 3 || parts[0].Length == 0) continue;
+                    playerColors[parts[0]] = new PlayerColorPacket
+                    {
+                        FillHex = ColorHex.Normalize(parts[1]),
+                        BorderHex = ColorHex.Normalize(parts[2])
+                    };
+                }
+            }
+            catch (Exception e)
+            {
+                sapi.Logger.Warning("[farplayermarkers] Could not read saved player colours: {0}", e.Message);
+            }
+        }
+
+        private void SavePlayerColors()
+        {
+            try
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (KeyValuePair<string, PlayerColorPacket> kv in playerColors)
+                {
+                    sb.Append(kv.Key).Append('\t').Append(kv.Value.FillHex ?? "").Append('\t').Append(kv.Value.BorderHex ?? "").Append('\n');
+                }
+                sapi.WorldManager.SaveGame.StoreData(ColorsSaveKey, Encoding.UTF8.GetBytes(sb.ToString()));
+            }
+            catch (Exception e)
+            {
+                sapi.Logger.Warning("[farplayermarkers] Could not save player colours: {0}", e.Message);
+            }
         }
 
         private void OnSaveServerSettingsReceived(IServerPlayer fromPlayer, SaveServerSettingsPacket packet)
@@ -265,6 +309,9 @@ namespace FarPlayerMarkers
                     names[wp.OwningPlayerUid] = ownerName;
                 }
 
+                PlayerColorPacket ownerColors;
+                playerColors.TryGetValue(wp.OwningPlayerUid, out ownerColors);
+
                 list.Add(new SharedWaypoint
                 {
                     X = wp.Position.X,
@@ -275,7 +322,9 @@ namespace FarPlayerMarkers
                     Color = wp.Color,
                     Pinned = wp.Pinned,
                     OwnerUid = wp.OwningPlayerUid,
-                    OwnerName = ownerName
+                    OwnerName = ownerName,
+                    OwnerFillHex = ownerColors != null ? ownerColors.FillHex : null,
+                    OwnerBorderHex = ownerColors != null ? ownerColors.BorderHex : null
                 });
             }
 
@@ -347,6 +396,7 @@ namespace FarPlayerMarkers
             foreach (SharedWaypoint w in waypoints)
             {
                 sb.Append(w.OwnerUid).Append('|').Append(w.Title).Append('|').Append(w.Icon).Append('|').Append(w.Color).Append('|').Append(w.Pinned)
+                  .Append('|').Append(w.OwnerFillHex).Append('|').Append(w.OwnerBorderHex)
                   .Append('|').Append((int)w.X).Append(',').Append((int)w.Y).Append(',').Append((int)w.Z).Append(';');
             }
             return sb.ToString();

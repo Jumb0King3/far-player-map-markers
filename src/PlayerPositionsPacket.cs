@@ -63,6 +63,8 @@ namespace FarPlayerMarkers
         public bool Pinned;
         public string OwnerUid;
         public string OwnerName;
+        public string OwnerFillHex;
+        public string OwnerBorderHex;
     }
 
     /// <summary>Every player's waypoints. Server to client, sent when they change.</summary>

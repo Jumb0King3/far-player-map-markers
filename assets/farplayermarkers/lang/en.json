@@ -29,5 +29,9 @@
   "farplayermarkers:edit": "Edit",
   "farplayermarkers:save": "Save",
   "farplayermarkers:new": "New",
-  "farplayermarkers:current": "Current"
+  "farplayermarkers:current": "Current",
+  "farplayermarkers:blocks-away": "{0} blocks away",
+  "farplayermarkers:died-here": "{0} died here",
+  "farplayermarkers:waypoint": "Waypoint",
+  "farplayermarkers:owners-waypoint": "{0}'s waypoint"
 }

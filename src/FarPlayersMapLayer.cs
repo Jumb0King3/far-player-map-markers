@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
@@ -68,7 +69,7 @@ namespace FarPlayerMarkers
                 foreach (SharedWaypoint wp in mod.SharedWaypoints)
                 {
                     if (wp == null || wp.OwnerUid == myUid) continue;
-                    DrawWaypoint(mapElem, wp, wpSize);
+                    DrawWaypoint(mapElem, wp, wpSize, mod, cfg);
                 }
             }
 
@@ -124,15 +125,28 @@ namespace FarPlayerMarkers
             );
         }
 
-        private void DrawWaypoint(GuiElementMap mapElem, SharedWaypoint wp, float size)
+        private void DrawWaypoint(GuiElementMap mapElem, SharedWaypoint wp, float size, FarPlayerMarkersMod mod, ClientConfig cfg)
         {
             double x, y;
             bool clamped;
             if (!ScreenPos(mapElem, new Vec3d(wp.X, wp.Y, wp.Z), size, wp.Pinned, out x, out y, out clamped)) return;
 
-            // Icon in the waypoint's own colour, with a black copy behind it as an outline.
-            LoadedTexture icon = GetIconTexture(wp.Icon, OpaqueColor(wp.Color));
-            LoadedTexture outline = icon != null ? GetIconTexture(wp.Icon, OpaqueColor(0)) : null;
+            // Normally the waypoint's own colour with a black outline. A death marker is drawn in
+            // the colours of the player who died (the same colours as their player marker).
+            int fillArgb = OpaqueColor(wp.Color);
+            int borderArgb = OpaqueColor(0);
+            string iconName = wp.Icon;
+            if (IsDeathWaypoint(wp))
+            {
+                string fillHex, borderHex;
+                OwnerColors(wp, mod, cfg, out fillHex, out borderHex);
+                fillArgb = HexToArgb(fillHex, fillArgb);
+                borderArgb = HexToArgb(borderHex, borderArgb);
+                if (string.IsNullOrEmpty(iconName)) iconName = "gravestone";
+            }
+
+            LoadedTexture icon = GetIconTexture(iconName, fillArgb);
+            LoadedTexture outline = icon != null ? GetIconTexture(iconName, borderArgb) : null;
 
             if (icon != null)
             {
@@ -148,11 +162,41 @@ namespace FarPlayerMarkers
             }
 
             // Icon file couldn't be found: fall back to a diamond in the waypoint's colour.
-            LoadedTexture tex = GetWaypointTexture(wp.Color, size);
+            LoadedTexture tex = GetWaypointTexture(fillArgb & 0x00FFFFFF, size);
             if (tex == null) return;
 
             capi.Render.Render2DTexturePremultipliedAlpha(tex.TextureId,
                 (float)(x - size / 2), (float)(y - size / 2), size, size, 55);
+        }
+
+        /// <summary>
+        /// The colours a player's marker is drawn in: what they chose (live if they're online, else
+        /// what the server remembered), or your "others" colours if player-chosen colours are off.
+        /// </summary>
+        private static void OwnerColors(SharedWaypoint wp, FarPlayerMarkersMod mod, ClientConfig cfg, out string fillHex, out string borderHex)
+        {
+            fillHex = cfg.OtherFillColorHex;
+            borderHex = cfg.OtherBorderColorHex;
+            if (!cfg.UsePlayerSelectedColors) return;
+
+            string fill = wp.OwnerFillHex, border = wp.OwnerBorderHex;
+            KnownPlayer kp;
+            if (wp.OwnerUid != null && mod.KnownPlayers.TryGetValue(wp.OwnerUid, out kp))
+            {
+                if (ColorHex.Normalize(kp.FillHex) != null) fill = kp.FillHex;
+                if (ColorHex.Normalize(kp.BorderHex) != null) border = kp.BorderHex;
+            }
+            if (ColorHex.Normalize(fill) != null) fillHex = fill;
+            if (ColorHex.Normalize(border) != null) borderHex = border;
+        }
+
+        /// <summary>A "#RRGGBB" colour as an opaque ARGB int, or the fallback if it can't be read.</summary>
+        private static int HexToArgb(string hex, int fallback)
+        {
+            double r, g, b, a;
+            if (!ColorHex.TryParse(hex, out r, out g, out b, out a)) return fallback;
+            int ri = (int)Math.Round(r * 255), gi = (int)Math.Round(g * 255), bi = (int)Math.Round(b * 255);
+            return unchecked((int)(0xFF000000u | ((uint)ri << 16) | ((uint)gi << 8) | (uint)bi));
         }
 
         /// <summary>Waypoint colours are stored as RGB; make sure they are fully opaque (ARGB).</summary>
@@ -374,7 +418,7 @@ namespace FarPlayerMarkers
                 if (Math.Abs(x - args.X) > half || Math.Abs(y - args.Y) > half) continue;
 
                 hoverText.AppendLine(myPos != null
-                    ? kp.Name + " (" + (int)Math.Round(myPos.DistanceTo(pos)) + " blocks away)"
+                    ? kp.Name + " (" + Lang.Get("farplayermarkers:blocks-away", (int)Math.Round(myPos.DistanceTo(pos))) + ")"
                     : kp.Name);
             }
 
@@ -392,11 +436,42 @@ namespace FarPlayerMarkers
                 if (!ScreenPos(mapElem, pos, wpSize, wp.Pinned, out x, out y, out clamped)) continue;
                 if (Math.Abs(x - args.X) > wpHalf || Math.Abs(y - args.Y) > wpHalf) continue;
 
-                string title = string.IsNullOrEmpty(wp.Title) ? "Waypoint" : wp.Title;
-                string line = title + " (" + wp.OwnerName + "'s waypoint";
-                if (myPos != null) line += ", " + (int)Math.Round(myPos.DistanceTo(pos)) + " blocks away";
-                hoverText.AppendLine(line + ")");
+                hoverText.AppendLine(HoverLine(wp, myPos != null ? (int?)(int)Math.Round(myPos.DistanceTo(pos)) : null));
             }
+        }
+
+        /// <summary>
+        /// Hover text for a shared waypoint, worded for the person looking at it.
+        /// The game names a death waypoint "You died here" from its owner's point of view,
+        /// so for everyone else it becomes "Name died here".
+        /// </summary>
+        private static string HoverLine(SharedWaypoint wp, int? distance)
+        {
+            string owner = string.IsNullOrEmpty(wp.OwnerName) ? Lang.Get("farplayermarkers:unknown") : wp.OwnerName;
+            string dist = distance.HasValue ? Lang.Get("farplayermarkers:blocks-away", distance.Value) : null;
+
+            if (IsDeathWaypoint(wp))
+            {
+                string died = Lang.Get("farplayermarkers:died-here", owner);
+                return dist != null ? died + " (" + dist + ")" : died;
+            }
+
+            string title = string.IsNullOrWhiteSpace(wp.Title) ? Lang.Get("farplayermarkers:waypoint") : wp.Title.Trim();
+            string whose = Lang.Get("farplayermarkers:owners-waypoint", owner);
+            return title + " (" + whose + (dist != null ? ", " + dist : "") + ")";
+        }
+
+        /// <summary>
+        /// The game's automatic death waypoint: titled "You died here" (in the server's language).
+        /// A waypoint a player named themselves is left alone, even with the gravestone icon.
+        /// </summary>
+        private static bool IsDeathWaypoint(SharedWaypoint wp)
+        {
+            if (string.IsNullOrWhiteSpace(wp.Title)) return false;
+            string t = wp.Title.Trim();
+            if (string.Equals(t, "You died here", StringComparison.OrdinalIgnoreCase)) return true;
+            string local = Lang.Get("You died here");
+            return !string.IsNullOrEmpty(local) && string.Equals(t, local.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

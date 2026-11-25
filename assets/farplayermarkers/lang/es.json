@@ -29,5 +29,9 @@
   "farplayermarkers:edit": "Editar",
   "farplayermarkers:save": "Guardar",
   "farplayermarkers:new": "Nuevo",
-  "farplayermarkers:current": "Actual"
+  "farplayermarkers:current": "Actual",
+  "farplayermarkers:blocks-away": "a {0} bloques",
+  "farplayermarkers:died-here": "{0} murió aquí",
+  "farplayermarkers:waypoint": "Punto de ruta",
+  "farplayermarkers:owners-waypoint": "punto de ruta de {0}"
 }
